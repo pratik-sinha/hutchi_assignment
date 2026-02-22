@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dog Breed Catalog</title>
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon" />
+
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+
+    th {
+      background: #f0f0f0;
+    }
+
+    button {
+      padding: 6px 10px;
+      margin-right: 5px;
+      cursor: pointer;
+    }
+
+    .btn-delete {
+      background: #e74c3c;
+      color: white;
+      border: none;
+    }
+
+    .btn-update {
+      background: #3498db;
+      color: white;
+      border: none;
+    }
+
+    form {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 10px;
+    }
+
+    input {
+      padding: 8px;
+    }
+
+    /* ---------- Spinner ---------- */
+
+    .spinner-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 6px solid #ddd;
+      border-top: 6px solid #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Dog Breed Catalog</h1>
+
+  <!-- Spinner -->
+  <div id="spinner" class="spinner-overlay hidden">
+    <div class="spinner"></div>
+  </div>
+
+  <div class="container">
+
+    <!-- Create / Update Form -->
+    <form id="dogForm">
+      <input type="hidden" id="dogId" />
+      <input type="text" id="breed" placeholder="Breed" required />
+      <input type="text" id="subBreed" placeholder="Sub Breed" required />
+      <button type="submit">Save</button>
+    </form>
+
+    <!-- Dog Table -->
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Breed</th>
+          <th>Sub Breed</th>
+          <th>Created At</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="dogTable"></tbody>
+    </table>
+
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:8080/api";
+
+    const tableBody = document.getElementById("dogTable");
+    const form = document.getElementById("dogForm");
+    const dogIdInput = document.getElementById("dogId");
+    const breedInput = document.getElementById("breed");
+    const subBreedInput = document.getElementById("subBreed");
+    const spinner = document.getElementById("spinner");
+
+    function showSpinner() {
+      spinner.classList.remove("hidden");
+    }
+
+    function hideSpinner() {
+      spinner.classList.add("hidden");
+    }
+
+    // Load all dogs
+    async function loadDogs() {
+      try {
+        showSpinner();
+
+        const res = await fetch(`${API_BASE}/getdogs`);
+        const data = await res.json();
+
+        tableBody.innerHTML = "";
+
+        data.body.forEach(dog => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${dog.ID}</td>
+            <td>${dog.Breed}</td>
+            <td>${dog.SubBreed}</td>
+            <td>${new Date(dog.CreatedAt).toLocaleString()}</td>
+            <td>
+              <button class="btn-update" onclick='editDog(${JSON.stringify(dog)})'>Edit</button>
+              <button class="btn-delete" onclick='deleteDog("${dog.ID}")'>Delete</button>
+            </td>
+          `;
+          tableBody.appendChild(row);
+        });
+
+      } finally {
+        hideSpinner();
+      }
+    }
+
+    // Create / Update
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const id = dogIdInput.value;
+      const payload = {
+        breed: breedInput.value,
+        sub_breed: subBreedInput.value
+      };
+
+      let url = `${API_BASE}/createdog`;
+      let method = "POST";
+
+      if (id) {
+        url = `${API_BASE}/updatedog`;
+        method = "PUT";
+        payload.id = id;
+      }
+
+      try {
+        showSpinner();
+
+        await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        form.reset();
+        dogIdInput.value = "";
+        loadDogs();
+
+      } finally {
+        hideSpinner();
+      }
+    });
+
+    // Edit
+    function editDog(dog) {
+      dogIdInput.value = dog.ID;
+      breedInput.value = dog.Breed;
+      subBreedInput.value = dog.SubBreed;
+    }
+
+    // Delete
+    async function deleteDog(id) {
+      if (!confirm("Delete this dog?")) return;
+
+      try {
+        showSpinner();
+
+        await fetch(`${API_BASE}/deletedog`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id })
+        });
+
+        loadDogs();
+
+      } finally {
+        hideSpinner();
+      }
+    }
+
+    loadDogs();
+  </script>
+
+</body>
+</html>
